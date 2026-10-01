@@ -1,0 +1,78 @@
+services:
+  postgres:
+    image: postgres:16
+    platform: linux/amd64
+    container_name: dw_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: dw_user
+      POSTGRES_PASSWORD: dw_pass
+      POSTGRES_DB: walmart_dw
+    ports:
+      - "25432:5432"
+    networks:
+      - dw_net
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./raw_data:/home/raw_data
+      - ./init_db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dw_user -d walmart_dw"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4
+    platform: linux/amd64
+    container_name: dw_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: dw_user@mail.com
+      PGADMIN_DEFAULT_PASSWORD: dw_pass
+    ports:
+      - "28880:80"
+    networks:
+      - dw_net
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+  metabase:
+    image: metabase/metabase
+    platform: linux/amd64
+    container_name: dw_metabase
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "23000:3000"
+    networks:
+      - dw_net
+
+  dbt:
+    image: ghcr.io/dbt-labs/dbt-postgres:1.8.2
+    platform: linux/amd64
+    container_name: dw_dbt
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /usr/app
+    entrypoint: [ "/bin/bash", "-c", "tail -f /dev/null" ]
+    ports:
+      - "28088:8080"
+    networks:
+      - dw_net
+    volumes:
+      - ./dbt:/usr/app
+      - ./dbt_root:/root/.dbt
+
+networks:
+  dw_net:
+    driver: bridge
+
+volumes:
+  pg_data:
+  pgadmin_data:
