@@ -1,23 +1,20 @@
-with ranked_customers as (
-    select
+-- customer attributes vary per customer_id in the source, so each distinct
+-- attribute combination is its own member (the profile as of that transaction).
+with distinct_customers as (
+    select distinct
         customer_id,
         customer_age,
         customer_gender,
         customer_income,
-        customer_loyalty_level,
-        row_number() over (
-            partition by customer_id
-            order by transaction_timestamp desc
-        ) as rn
+        customer_loyalty_level
     from {{ ref('stg_walmart_sales') }}
 )
 
 select
-    md5(customer_id::text) as customer_key,
+    md5(concat_ws('|', customer_id, customer_age, customer_gender, customer_income, customer_loyalty_level)) as customer_key,
     customer_id,
     customer_age,
     customer_gender,
     customer_income,
     customer_loyalty_level
-from ranked_customers
-where rn = 1
+from distinct_customers

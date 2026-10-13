@@ -1,17 +1,14 @@
-with ranked_suppliers as (
-    select
+-- supplier_lead_time varies per supplier_id in the source,
+-- so each distinct (supplier_id, supplier_lead_time) combination is its own member.
+with distinct_suppliers as (
+    select distinct
         supplier_id,
-        supplier_lead_time,
-        row_number() over (
-            partition by supplier_id
-            order by transaction_timestamp desc
-        ) as rn
+        supplier_lead_time
     from {{ ref('stg_walmart_sales') }}
 )
 
 select
-    md5(supplier_id::text) as supplier_key,
+    md5(concat_ws('|', supplier_id, supplier_lead_time)) as supplier_key,
     supplier_id,
     supplier_lead_time
-from ranked_suppliers
-where rn = 1
+from distinct_suppliers

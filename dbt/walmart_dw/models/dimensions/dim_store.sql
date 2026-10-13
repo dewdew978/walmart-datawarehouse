@@ -1,17 +1,14 @@
-with ranked_stores as (
-    select
+-- store_id is not stable in the source (one id appears in several locations),
+-- so each distinct (store_id, store_location) combination is its own member.
+with distinct_stores as (
+    select distinct
         store_id,
-        store_location,
-        row_number() over (
-            partition by store_id
-            order by transaction_timestamp desc
-        ) as rn
+        store_location
     from {{ ref('stg_walmart_sales') }}
 )
 
 select
-    md5(store_id::text) as store_key,
+    md5(concat_ws('|', store_id, store_location)) as store_key,
     store_id,
     store_location
-from ranked_stores
-where rn = 1
+from distinct_stores

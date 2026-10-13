@@ -1,19 +1,16 @@
-with ranked_products as (
-    select
+-- product_id is not stable in the source (one id appears with several names/categories),
+-- so each distinct (product_id, product_name, category) combination is its own member.
+with distinct_products as (
+    select distinct
         product_id,
         product_name,
-        category,
-        row_number() over (
-            partition by product_id
-            order by transaction_timestamp desc
-        ) as rn
+        category
     from {{ ref('stg_walmart_sales') }}
 )
 
 select
-    md5(product_id::text) as product_key,
+    md5(concat_ws('|', product_id, product_name, category)) as product_key,
     product_id,
     product_name,
     category
-from ranked_products
-where rn = 1
+from distinct_products

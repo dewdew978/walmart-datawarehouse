@@ -16,3 +16,6 @@ ENV/
 Thumbs.db
 .vscode/
 .idea/
+
+# dbt user/anonymous id
+dbt_root/.user.yml
