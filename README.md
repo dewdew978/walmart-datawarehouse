@@ -8,10 +8,10 @@
 
 | บริการ | Container Name | URL / Port | ข้อมูลเข้าใช้งาน (Credentials) |
 | :--- | :--- | :--- | :--- |
-| **PostgreSQL 16** | `dw_postgres` | `localhost:25432` | User: `dw_user` / Pass: `dw_pass` / DB: `walmart_dw` |
-| **pgAdmin 4** | `dw_pgadmin` | [http://localhost:28880](http://localhost:28880) | Email: `dw_user@mail.com` / Pass: `dw_pass` |
-| **Metabase (BI)** | `dw_metabase` | [http://localhost:23000](http://localhost:23000) | Setup ครั้งแรกผ่านหน้าเว็บ |
-| **dbt Core** | `dw_dbt` | Container CLI / Port `28088` (Docs) | รันผ่านคำสั่ง Docker Exec |
+| **PostgreSQL 16** | `wmt_postgres` | `localhost:35432` | User: `dw_user` / Pass: `dw_pass` / DB: `walmart_dw` |
+| **pgAdmin 4** | `wmt_pgadmin` | [http://localhost:38880](http://localhost:38880) | Email: `dw_user@mail.com` / Pass: `dw_pass` |
+| **Metabase (BI)** | `wmt_metabase` | [http://localhost:33000](http://localhost:33000) | Setup ครั้งแรกผ่านหน้าเว็บ |
+| **dbt Core** | `wmt_dbt` | Container CLI / Port `38088` (Docs) | รันผ่านคำสั่ง Docker Exec |
 
 ---
 
@@ -37,23 +37,23 @@ docker compose ps
 
 #### 2.1 ตรวจสอบการเชื่อมต่อ
 ```bash
-docker exec -it dw_dbt bash -c "cd walmart_dw && dbt debug"
+docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt debug"
 ```
 
 #### 2.2 สร้างโมเดลทั้งหมด (Staging -> Dimensions -> Fact -> Metrics)
 ```bash
-docker exec -it dw_dbt bash -c "cd walmart_dw && dbt run"
+docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt run"
 ```
 
 #### 2.3 ตรวจสอบคุณภาพข้อมูล (Data Quality Tests)
 ทดสอบ `unique`, `not_null`, `accepted_values` (ค่าที่ผ่านการทำความสะอาดแล้ว), `relationships` (Foreign Keys) และ `tests/assert_fact_attributes_match_source.sql` (attribute ใน dimension ตรงกับข้อมูลต้นทาง):
 ```bash
-docker exec -it dw_dbt bash -c "cd walmart_dw && dbt test"
+docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt test"
 ```
 
 #### 2.4 สร้างเอกสารคู่มือคลังข้อมูล (dbt Docs)
 ```bash
-docker exec -it dw_dbt bash -c "cd walmart_dw && dbt docs generate"
+docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt docs generate"
 ```
 
 ---
@@ -108,7 +108,7 @@ python generate_data.py --dirty-rate 0     # ข้อมูลสะอาด
 
 ## 📊 การเชื่อมต่อ Metabase เพื่อสร้าง Dashboard
 
-1. เข้าเบราว์เซอร์ไปที่: [http://localhost:23000](http://localhost:23000)
+1. เข้าเบราว์เซอร์ไปที่: [http://localhost:33000](http://localhost:33000)
 2. ทำตามขั้นตอนตั้งค่าเริ่มต้นของ Metabase (สร้างแอดมิน)
 3. เลือกเพิ่มฐานข้อมูล (**Add your data**):
    - **Database type:** PostgreSQL

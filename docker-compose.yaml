@@ -1,15 +1,17 @@
+name: walmart-dw
+
 services:
   postgres:
     image: postgres:16
     platform: linux/amd64
-    container_name: dw_postgres
+    container_name: wmt_postgres
     restart: always
     environment:
       POSTGRES_USER: dw_user
       POSTGRES_PASSWORD: dw_pass
       POSTGRES_DB: walmart_dw
     ports:
-      - "25432:5432"
+      - "35432:5432"
     networks:
       - dw_net
     volumes:
@@ -26,13 +28,13 @@ services:
   pgadmin:
     image: dpage/pgadmin4
     platform: linux/amd64
-    container_name: dw_pgadmin
+    container_name: wmt_pgadmin
     restart: always
     environment:
       PGADMIN_DEFAULT_EMAIL: dw_user@mail.com
       PGADMIN_DEFAULT_PASSWORD: dw_pass
     ports:
-      - "28880:80"
+      - "38880:80"
     networks:
       - dw_net
     volumes:
@@ -41,20 +43,20 @@ services:
   metabase:
     image: metabase/metabase
     platform: linux/amd64
-    container_name: dw_metabase
+    container_name: wmt_metabase
     restart: always
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "23000:3000"
+      - "33000:3000"
     networks:
       - dw_net
 
   dbt:
     image: ghcr.io/dbt-labs/dbt-postgres:1.8.2
     platform: linux/amd64
-    container_name: dw_dbt
+    container_name: wmt_dbt
     restart: always
     depends_on:
       postgres:
@@ -62,7 +64,7 @@ services:
     working_dir: /usr/app
     entrypoint: [ "/bin/bash", "-c", "tail -f /dev/null" ]
     ports:
-      - "28088:8080"
+      - "38088:8080"
     networks:
       - dw_net
     volumes:
