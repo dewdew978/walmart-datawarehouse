@@ -1,94 +1,144 @@
 version: 2
 
 models:
+  - name: stg_walmart_sales
+    description: "Cleaned, de-duplicated sales line items from the raw load"
+    columns:
+      - name: transaction_id
+        data_tests: [unique, not_null]
+      - name: transaction_timestamp
+        data_tests: [not_null]
+      - name: unit_price
+        data_tests: [not_null]
+      - name: customer_age
+        description: "Null only when missing in the raw data and the customer has no other transaction to impute from"
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: category
+        data_tests:
+          - accepted_values:
+              values: ['Electronics', 'Appliances']
+      - name: store_location
+        data_tests:
+          - accepted_values:
+              values: ['New York, NY', 'Los Angeles, CA', 'Chicago, IL', 'Dallas, TX', 'Miami, FL']
+      - name: customer_gender
+        data_tests:
+          - accepted_values:
+              values: ['Male', 'Female', 'Other', 'Unknown']
+      - name: customer_loyalty_level
+        data_tests:
+          - accepted_values:
+              values: ['Bronze', 'Silver', 'Gold', 'Platinum']
+      - name: payment_method
+        data_tests:
+          - accepted_values:
+              values: ['Credit Card', 'Debit Card', 'Cash', 'Digital Wallet']
+      - name: promotion_type
+        data_tests:
+          - accepted_values:
+              values: ['No Promotion', 'BOGO', 'Percentage Discount']
+      - name: weather_conditions
+        data_tests:
+          - accepted_values:
+              values: ['Sunny', 'Cloudy', 'Rainy', 'Stormy']
+      - name: promotion_applied
+        data_tests: [not_null]
+      - name: holiday_indicator
+        data_tests: [not_null]
+      - name: stockout_indicator
+        data_tests: [not_null]
+
   - name: dim_product
     description: "Product Dimension table"
     columns:
       - name: product_key
-        tests:
+        data_tests:
           - unique
           - not_null
       - name: product_id
-        tests:
+        data_tests:
           - not_null
 
   - name: dim_customer
     description: "Customer Dimension table"
     columns:
       - name: customer_key
-        tests:
+        data_tests:
           - unique
           - not_null
       - name: customer_id
-        tests:
+        data_tests:
           - not_null
 
   - name: dim_store
     description: "Store Dimension table"
     columns:
       - name: store_key
-        tests:
+        data_tests:
           - unique
           - not_null
       - name: store_id
-        tests:
+        data_tests:
           - not_null
 
   - name: dim_supplier
     description: "Supplier Dimension table"
     columns:
       - name: supplier_key
-        tests:
+        data_tests:
           - unique
           - not_null
       - name: supplier_id
-        tests:
+        data_tests:
           - not_null
 
   - name: dim_date
     description: "Date Dimension table"
     columns:
       - name: date_key
-        tests:
+        data_tests:
           - unique
           - not_null
       - name: full_date
-        tests:
+        data_tests:
           - not_null
 
   - name: fct_walmart_sales
     description: "Walmart Sales Fact table (Line Item Grain)"
     columns:
       - name: sales_key
-        tests:
+        data_tests:
           - unique
           - not_null
       - name: product_key
-        tests:
+        data_tests:
           - not_null
           - relationships:
               to: ref('dim_product')
               field: product_key
       - name: customer_key
-        tests:
+        data_tests:
           - not_null
           - relationships:
               to: ref('dim_customer')
               field: customer_key
       - name: store_key
-        tests:
+        data_tests:
           - not_null
           - relationships:
               to: ref('dim_store')
               field: store_key
       - name: supplier_key
-        tests:
+        data_tests:
           - not_null
           - relationships:
               to: ref('dim_supplier')
               field: supplier_key
       - name: date_key
-        tests:
+        data_tests:
           - not_null
           - relationships:
               to: ref('dim_date')

@@ -32,5 +32,5 @@ CREATE TABLE IF NOT EXISTS raw_walmart_sales (
 
 -- Copy data directly from the mounted raw_data folder
 COPY raw_walmart_sales
-FROM '/home/raw_data/Walmart.csv'
+FROM '/home/raw_data/walmart_sales_v2.csv'
 WITH (FORMAT csv, HEADER true, DELIMITER ',');

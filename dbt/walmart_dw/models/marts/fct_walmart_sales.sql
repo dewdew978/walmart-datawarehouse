@@ -61,7 +61,7 @@ left join products p
     and s.category     = p.category
 left join customers c
     on  s.customer_id            = c.customer_id
-    and s.customer_age           = c.customer_age
+    and coalesce(s.customer_age, -1) = coalesce(c.customer_age, -1)  -- age may be null (not imputable); keep the join hashable
     and s.customer_gender        = c.customer_gender
     and s.customer_income        = c.customer_income
     and s.customer_loyalty_level = c.customer_loyalty_level
