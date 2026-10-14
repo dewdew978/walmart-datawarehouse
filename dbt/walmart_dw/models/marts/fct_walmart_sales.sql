@@ -59,12 +59,11 @@ left join products p
     on  s.product_id   = p.product_id
     and s.product_name = p.product_name
     and s.category     = p.category
+-- SCD Type 2: pick the customer version in effect at the time of the sale
 left join customers c
-    on  s.customer_id            = c.customer_id
-    and coalesce(s.customer_age, -1) = coalesce(c.customer_age, -1)  -- age may be null (not imputable); keep the join hashable
-    and s.customer_gender        = c.customer_gender
-    and s.customer_income        = c.customer_income
-    and s.customer_loyalty_level = c.customer_loyalty_level
+    on  s.customer_id = c.customer_id
+    and s.transaction_timestamp >= c.valid_from
+    and (s.transaction_timestamp < c.valid_to or c.valid_to is null)
 left join stores st
     on  s.store_id       = st.store_id
     and s.store_location = st.store_location

@@ -3,7 +3,9 @@ Walmart Sales Synthetic Data Generator
 DSBA8 Data Warehousing Project
 
 Generates a realistic, reproducible replacement for the original Walmart.csv:
-  - Stable master data: each product/store/customer/supplier id has one set of attributes
+  - Stable master data: each product/store/supplier id has one set of attributes
+  - Customer loyalty upgrades during the year (one tier up, ~12% of customers), to be
+    tracked as a Slowly Changing Dimension Type 2; upgraded customers then shop more often
   - Full calendar year 2024 with seasonality, weekends, US holidays and Black Friday
   - Business relationships the dashboards can surface (promotions lift quantity,
     long supplier lead times and under-forecasting drive stockouts, loyalty tiers
@@ -72,6 +74,8 @@ WEEKDAY_TRAFFIC = {0: .90, 1: .85, 2: .90, 3: .95, 4: 1.10, 5: 1.30, 6: 1.15}  #
 
 LOYALTY_TIERS = ['Bronze', 'Silver', 'Gold', 'Platinum']
 LOYALTY_FREQUENCY = {'Bronze': 1.0, 'Silver': 1.5, 'Gold': 2.2, 'Platinum': 3.0}
+UPGRADE_SHARE = 0.12
+UPGRADE_WINDOW = (dt.date(YEAR, 3, 1), dt.date(YEAR, 10, 31))
 PAYMENT_METHODS = ['Credit Card', 'Debit Card', 'Cash', 'Digital Wallet']
 HOUR_WEIGHTS = {8: 2, 9: 3, 10: 5, 11: 7, 12: 8, 13: 7, 14: 5, 15: 5, 16: 6, 17: 8, 18: 9, 19: 8, 20: 6, 21: 4, 22: 2}
 
@@ -108,7 +112,32 @@ def build_master_data(rng):
             'customer_income': round(income, 2), 'customer_loyalty_level': tier,
             'home_store': rng.choice(stores)['store_id'],
         })
+
+    # Mid-year loyalty upgrades (SCD Type 2 changes)
+    window_days = (UPGRADE_WINDOW[1] - UPGRADE_WINDOW[0]).days
+    for c in customers:
+        c['upgrade_date'], c['upgraded_tier'] = None, None
+        if c['customer_loyalty_level'] != 'Platinum' and rng.random() < UPGRADE_SHARE:
+            c['upgrade_date'] = UPGRADE_WINDOW[0] + dt.timedelta(rng.randint(0, window_days))
+            c['upgraded_tier'] = LOYALTY_TIERS[LOYALTY_TIERS.index(c['customer_loyalty_level']) + 1]
     return suppliers, products, stores, customers
+
+
+def tier_on(customer, d):
+    if customer['upgrade_date'] and d >= customer['upgrade_date']:
+        return customer['upgraded_tier']
+    return customer['customer_loyalty_level']
+
+
+def pick_customer(rng, pool, weights, d):
+    """Weights use each customer's final tier; before an upgrade, reject draws so the
+    customer shops at their original tier's frequency."""
+    while True:
+        c = rng.choices(pool, weights=weights)[0]
+        if not c['upgrade_date'] or d >= c['upgrade_date']:
+            return c
+        if rng.random() < LOYALTY_FREQUENCY[c['customer_loyalty_level']] / LOYALTY_FREQUENCY[c['upgraded_tier']]:
+            return c
 
 
 def build_calendar(rng):
@@ -144,7 +173,7 @@ def generate_rows(rng, n_rows):
     by_home = collections.defaultdict(list)
     for c in customers:
         by_home[c['home_store']].append(c)
-    freq = lambda pool: [LOYALTY_FREQUENCY[c['customer_loyalty_level']] for c in pool]
+    freq = lambda pool: [LOYALTY_FREQUENCY[c['upgraded_tier'] or c['customer_loyalty_level']] for c in pool]
     all_freq = freq(customers)
     home_freq = {sid: freq(pool) for sid, pool in by_home.items()}
 
@@ -157,9 +186,9 @@ def generate_rows(rng, n_rows):
         city = store['store_location']
         holiday = d in HOLIDAYS
         if rng.random() < 0.85 and by_home[store['store_id']]:
-            customer = rng.choices(by_home[store['store_id']], weights=home_freq[store['store_id']])[0]
+            customer = pick_customer(rng, by_home[store['store_id']], home_freq[store['store_id']], d)
         else:
-            customer = rng.choices(customers, weights=all_freq)[0]
+            customer = pick_customer(rng, customers, all_freq, d)
         product = rng.choices(products, weights=product_weights[d.month])[0]
         lead_time = suppliers[product['supplier_id']]
 
@@ -207,7 +236,7 @@ def generate_rows(rng, n_rows):
             'supplier_id': product['supplier_id'], 'supplier_lead_time': lead_time,
             'customer_age': customer['customer_age'], 'customer_gender': customer['customer_gender'],
             'customer_income': f"{customer['customer_income']:.2f}",
-            'customer_loyalty_level': customer['customer_loyalty_level'], 'payment_method': payment,
+            'customer_loyalty_level': tier_on(customer, d), 'payment_method': payment,
             'promotion_applied': promotion_type != 'None', 'promotion_type': promotion_type,
             'weather_conditions': weather[(d, city)], 'holiday_indicator': holiday,
             'weekday': d.strftime('%A'), 'stockout_indicator': inventory < 20,
