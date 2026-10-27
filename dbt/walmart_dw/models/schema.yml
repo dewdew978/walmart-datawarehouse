@@ -2,7 +2,7 @@ version: 2
 
 models:
   - name: stg_walmart_sales
-    description: "Cleaned, de-duplicated sales line items from the raw load"
+    description: "Grain: one cleaned sale record per transaction_id after deduplication. The current source has one product line per transaction."
     columns:
       - name: transaction_id
         data_tests: [unique, not_null]
@@ -52,7 +52,7 @@ models:
         data_tests: [not_null]
 
   - name: dim_product
-    description: "Product Dimension table"
+    description: "Grain: one distinct (product_id, product_name, category) member, identified by product_key."
     columns:
       - name: product_key
         data_tests:
@@ -63,7 +63,7 @@ models:
           - not_null
 
   - name: dim_customer
-    description: "Customer dimension, SCD Type 2: one row per customer version (loyalty upgrades create new versions)"
+    description: "Grain: one customer_id and version_number (SCD Type 2), identified by customer_key, valid over [valid_from, valid_to). Tracked attribute changes create versions."
     columns:
       - name: customer_key
         description: "Surrogate key per customer version"
@@ -87,7 +87,7 @@ models:
           - not_null
 
   - name: dim_store
-    description: "Store Dimension table"
+    description: "Grain: one distinct (store_id, store_location) member, identified by store_key. Several stores can share a location."
     columns:
       - name: store_key
         data_tests:
@@ -98,7 +98,7 @@ models:
           - not_null
 
   - name: dim_supplier
-    description: "Supplier Dimension table"
+    description: "Grain: one distinct (supplier_id, supplier_lead_time) member, identified by supplier_key."
     columns:
       - name: supplier_key
         data_tests:
@@ -109,7 +109,7 @@ models:
           - not_null
 
   - name: dim_date
-    description: "Date Dimension table"
+    description: "Grain: one calendar date present in the cleaned sales source, identified by date_key; not a complete date spine for periods without sales."
     columns:
       - name: date_key
         data_tests:
@@ -120,7 +120,7 @@ models:
           - not_null
 
   - name: fct_walmart_sales
-    description: "Walmart Sales Fact table (Line Item Grain)"
+    description: "Grain: one sales line identified by sales_key (transaction_id, product_id, transaction_timestamp). Current source has one line per transaction. Inventory and demand values are observations attached to sales, not independent daily snapshots."
     columns:
       - name: sales_key
         data_tests:
@@ -158,7 +158,7 @@ models:
               field: date_key
 
   - name: m01_sales_performance
-    description: "Metric layer: Total revenue, units sold, and AOV by store, category, and promotion"
+    description: "Grain: one (year, month_name, category, store_location, holiday_indicator, promotion_type) group. Location aggregates several stores; AOV is non-additive."
     columns:
       - name: year
         data_tests: [not_null]
@@ -174,7 +174,7 @@ models:
         data_tests: [not_null]
 
   - name: m02_customer_intelligence
-    description: "Metric layer: Customer purchasing behaviour, income, and AOV across loyalty tiers and payment methods"
+    description: "Grain: one (customer_loyalty_level, customer_gender, payment_method, store_location) group over all source dates. Distinct customers cannot be summed across groups; AOV and average income are non-additive."
     columns:
       - name: customer_loyalty_level
         data_tests: [not_null]
@@ -188,7 +188,7 @@ models:
         data_tests: [not_null]
 
   - name: m03_inventory_risk
-    description: "Metric layer: Stockout rate and demand forecast variance across categories, locations, and weather"
+    description: "Grain: one (store_location, category, weather_conditions) group over all source dates. Rates and averages are weighted by sale records, not independent daily inventory events."
     columns:
       - name: store_location
         data_tests: [not_null]
@@ -200,7 +200,7 @@ models:
         data_tests: [not_null]
 
   - name: m04_loyalty_upgrade_impact
-    description: "Metric layer: Spend per 30 days after customer loyalty tier upgrade compared to stable control group"
+    description: "Grain: one (from_tier, to_tier) group of customer version transitions. Post-upgrade spend per 30 days is compared with stable customers over the same window; uplift and rates are non-additive."
     columns:
       - name: from_tier
         data_tests: [not_null]
@@ -211,3 +211,52 @@ models:
       - name: uplift_vs_control
         data_tests: [not_null]
 
+
+  - name: smt_sales_summary
+    description: >-
+      Grain: one grouping_id plus retained (year, quarter, month_number,
+      store_location, category) combination. ROLLUP creates month/quarter/year/all_time
+      levels crossed with CUBE location_category/location/category/all_dimensions.
+      Omitted dimensions are NULL, distinguished from actual NULL by grouping_id.
+      Select one time_grain and dimension_grain before aggregating. AOV and distinct
+      transaction counts are computed directly from fact at each level; do not average AOV.
+    columns:
+      - name: summary_key
+        description: "Hash of grouping_id and all five dimension values, including explicit nulls."
+        data_tests: [unique, not_null]
+      - name: grouping_id
+        description: "GROUPING(year, quarter, month_number, store_location, category); 31 is the grand total."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 28, 29, 30, 31]
+              quote: false
+      - name: time_grain
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['month', 'quarter', 'year', 'all_time']
+      - name: dimension_grain
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['location_category', 'location', 'category', 'all_dimensions']
+      - name: year
+        description: "Calendar year; omitted (NULL) at all_time level."
+      - name: quarter
+        description: "Quarter number within year; omitted at year/all_time levels."
+      - name: month_number
+        description: "Month 1-12 within year/quarter; retained only at month level."
+      - name: store_location
+        description: "City/location, not store_id; omitted at category/all_dimensions levels."
+      - name: category
+        description: "Product category; omitted at location/all_dimensions levels."
+      - name: total_transactions
+        description: "Distinct transaction_id within this row's grain. Recount from fact if combining groups with multi-line bills."
+        data_tests: [not_null]
+      - name: total_units_sold
+        data_tests: [not_null]
+      - name: total_revenue
+        data_tests: [not_null]
+      - name: aov
+        description: "Revenue divided by distinct transactions at this grain; NULL when there are no transactions."

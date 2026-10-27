@@ -18,3 +18,5 @@ models:
       +materialized: table
     metrics:
       +materialized: table
+    summaries:
+      +materialized: table
