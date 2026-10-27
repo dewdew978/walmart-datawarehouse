@@ -18,10 +18,11 @@
 ## 🚀 วิธีเริ่มต้นใช้งาน (Quick Start)
 
 ### 1. รัน Container ทั้งหมด
-เปิด Terminal ที่โฟลเดอร์นี้ (`C:\Users\thewh\Downloads\walmart-datawarehouse`) แล้วรันคำสั่ง:
+เปิด Terminal ในโฟลเดอร์โปรเจกต์นี้ (`walmart-datawarehouse`) แล้วรันคำสั่ง:
 
 ```bash
 docker compose up -d
+# หรือใช้ make up
 ```
 
 ตรวจสอบสถานะให้ทุกคอนเทนเนอร์ขึ้น **Up / Running**:
@@ -51,10 +52,23 @@ docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt run"
 docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt test"
 ```
 
-#### 2.4 สร้างเอกสารคู่มือคลังข้อมูล (dbt Docs)
+#### 2.4 สร้างเอกสารและเปิดดูคู่มือคลังข้อมูล (dbt Docs)
 ```bash
 docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt docs generate"
+docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt docs serve --port 8080"
 ```
+เปิดดูเอกสารผ่านเบราว์เซอร์ได้ที่: [http://localhost:38088](http://localhost:38088)
+
+---
+
+### 3. รันผ่าน Shortcut (Makefile)
+สามารถสั่งการผ่านคำสั่ง `make` ได้สะดวกยิ่งขึ้น:
+- `make up` : รัน Docker Compose ทั้งหมด
+- `make down` : หยุดการทำงาน Container
+- `make dbt-run` : สั่งรันโมเดล dbt ทั้งหมด
+- `make dbt-test` : สั่งรัน Data Tests ทั้งหมด
+- `make dbt-docs` : สร้าง dbt Docs
+- `make dbt-serve`: สั่งเปิด web server ให้ dbt Docs บนพอร์ต 38088
 
 ---
 
@@ -90,6 +104,86 @@ python generate_data.py --dirty-rate 0     # ข้อมูลสะอาด
 ---
 
 ## 📐 สถาปัตยกรรมแบบจำลองข้อมูล (Star Schema)
+
+```mermaid
+erDiagram
+    dim_product ||--o{ fct_walmart_sales : "product_key"
+    dim_customer ||--o{ fct_walmart_sales : "customer_key (SCD2)"
+    dim_store ||--o{ fct_walmart_sales : "store_key"
+    dim_supplier ||--o{ fct_walmart_sales : "supplier_key"
+    dim_date ||--o{ fct_walmart_sales : "date_key"
+
+    fct_walmart_sales ||--o{ m01_sales_performance : "aggregates to"
+    fct_walmart_sales ||--o{ m02_customer_intelligence : "aggregates to"
+    fct_walmart_sales ||--o{ m03_inventory_risk : "aggregates to"
+    fct_walmart_sales ||--o{ m04_loyalty_upgrade_impact : "aggregates to"
+
+    dim_product {
+        varchar product_key PK
+        int product_id
+        varchar product_name
+        varchar category
+    }
+
+    dim_customer {
+        varchar customer_key PK
+        int customer_id
+        int customer_age
+        varchar customer_gender
+        numeric customer_income
+        varchar customer_loyalty_level
+        int version_number
+        timestamp valid_from
+        timestamp valid_to
+        boolean is_current
+    }
+
+    dim_store {
+        varchar store_key PK
+        int store_id
+        varchar store_location
+    }
+
+    dim_supplier {
+        varchar supplier_key PK
+        int supplier_id
+        int supplier_lead_time
+    }
+
+    dim_date {
+        int date_key PK
+        date full_date
+        varchar weekday
+        varchar month_name
+        int month_number
+        int quarter
+        int year
+        boolean holiday_indicator
+    }
+
+    fct_walmart_sales {
+        varchar sales_key PK
+        int transaction_id
+        int date_key FK
+        varchar product_key FK
+        varchar customer_key FK
+        varchar store_key FK
+        varchar supplier_key FK
+        int quantity_sold
+        numeric unit_price
+        numeric total_amount
+        int inventory_level
+        int reorder_point
+        int reorder_quantity
+        int forecasted_demand
+        int actual_demand
+        boolean stockout_indicator
+        varchar payment_method
+        boolean promotion_applied
+        varchar promotion_type
+        varchar weather_conditions
+    }
+```
 
 - **Grain ของ Fact:** 1 แถว ต่อ 1 รายการขายในใบเสร็จ (`sales_key` เป็น Surrogate Key)
 - **Fact Table:** `fct_walmart_sales`
@@ -127,4 +221,12 @@ python generate_data.py --dirty-rate 0     # ข้อมูลสะอาด
    - **Database name:** `walmart_dw`
    - **Database username:** `dw_user`
    - **Database password:** `dw_pass`
-4. สร้าง Dashboards และ Visualizations ตอบโจทย์ KPIs 3 ด้านได้ทันที!
+4. สร้าง Dashboards และ Visualizations ตอบโจทย์ KPIs 4 ด้านสำคัญได้ทันที:
+
+| Dashboard / คำถามทางธุรกิจ | ตารางข้อมูลที่ใช้ | รูปแบบ Visualization ที่แนะนำ |
+| :--- | :--- | :--- |
+| **1. Sales Performance & Promotion Effect** | `m01_sales_performance` | - **Line Chart:** แนวโน้มรายได้รายเดือนแยกตาม Category<br>- **Bar Chart:** ยอดขายและ AOV ตามประเภท Promotion |
+| **2. Customer Intelligence & Loyalty** | `m02_customer_intelligence` | - **Pie / Donut Chart:** สัดส่วนลูกค้าและยอดใช้จ่ายแยกตาม Loyalty Level<br>- **Bar Chart:** วิธีการชำระเงินยอดนิยมในแต่ละสาขา |
+| **3. Inventory & Supply Chain Risk** | `m03_inventory_risk` | - **Table / Heatmap:** Stockout Rate (%) แยกตาม Store Location และ Category<br>- **Scatter / Bar:** ความคลาดเคลื่อน Forecast Variance เทียบกับ Lead Time |
+| **4. Loyalty Upgrade Impact (SCD2 Uplift)** | `m04_loyalty_upgrade_impact` | - **Bar Chart:** Uplift vs Control (%) เมื่อลูกค้าเลื่อนขั้น (Bronze -> Silver, Silver -> Gold, Gold -> Platinum)<br>- **Metric Card:** Average Spend ต่อ 30 วันหลัง Upgrade |
+
