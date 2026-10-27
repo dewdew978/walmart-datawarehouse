@@ -19,3 +19,6 @@ Thumbs.db
 
 # dbt user/anonymous id
 dbt_root/.user.yml
+
+# Local Metabase application database backups
+.metabase-backup/

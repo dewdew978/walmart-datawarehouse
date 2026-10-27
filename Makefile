@@ -28,4 +28,4 @@ dbt-docs:
 	docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt docs generate"
 
 dbt-serve:
-	docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt docs serve --port 8080"
+	docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt docs serve --port 8080 --host 0.0.0.0"

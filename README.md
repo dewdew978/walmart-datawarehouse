@@ -18,6 +18,8 @@
 ## 🚀 วิธีเริ่มต้นใช้งาน (Quick Start)
 
 ### 1. รัน Container ทั้งหมด
+
+**ถ้าเคยตั้งค่า Metabase แล้ว:** ทำขั้นตอนย้ายข้อมูลด้านล่างก่อนใช้ Compose เวอร์ชันนี้ เพื่อเก็บบัญชี Questions และ Dashboards เดิม
 เปิด Terminal ในโฟลเดอร์โปรเจกต์นี้ (`walmart-datawarehouse`) แล้วรันคำสั่ง:
 
 ```bash
@@ -55,9 +57,43 @@ docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt test"
 #### 2.4 สร้างเอกสารและเปิดดูคู่มือคลังข้อมูล (dbt Docs)
 ```bash
 docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt docs generate"
-docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt docs serve --port 8080"
+docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt docs serve --port 8080 --host 0.0.0.0"
 ```
 เปิดดูเอกสารผ่านเบราว์เซอร์ได้ที่: [http://localhost:38088](http://localhost:38088)
+
+---
+
+### ย้ายข้อมูล Metabase เดิมเข้า persistent volume (ครั้งเดียว)
+
+สำหรับเครื่องที่เคยรัน Metabase โดยไม่มี volume และยังใช้ค่าเริ่มต้น `/metabase.db` ให้สำรองฐานข้อมูลขณะหยุด Metabase **ก่อน pull และก่อนสร้าง container ใหม่** ตัวอย่าง PowerShell บน Windows:
+
+```powershell
+# รันในโฟลเดอร์โปรเจกต์ก่อน git pull
+$metabaseBackup = Join-Path $PWD (".metabase-backup/" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+New-Item -ItemType Directory -Path $metabaseBackup -Force | Out-Null
+docker stop wmt_metabase
+docker cp wmt_metabase:/metabase.db/. "$metabaseBackup"
+Get-ChildItem -LiteralPath $metabaseBackup
+```
+
+ตรวจว่ามี `metabase.db.mv.db` และทุกคำสั่งสำเร็จก่อนทำต่อ หากสำรองไม่สำเร็จ ให้ `docker start wmt_metabase` แล้วตรวจตำแหน่งฐานข้อมูลเดิมก่อน ห้ามสร้าง container ทับตัวเดิม
+
+```powershell
+git pull --ff-only
+# สร้าง container ใหม่พร้อม volume แต่ยังไม่เริ่ม Metabase
+docker compose create metabase
+docker cp "$metabaseBackup/." wmt_metabase:/metabase-data/metabase.db
+# ให้ UID/GID เริ่มต้นของ Metabase (2000:2000) อ่าน/เขียนไฟล์ได้
+docker compose run --rm --no-deps --user root --entrypoint sh metabase -c "chown -R 2000:2000 /metabase-data"
+docker compose up -d metabase
+Invoke-RestMethod http://localhost:33000/api/health
+```
+
+รอจน health เป็น `ok` แล้วล็อกอินด้วยบัญชีเดิมและตรวจ Questions/Dashboards ที่ [Metabase](http://localhost:33000) เก็บสำเนาสำรองไว้จนยืนยันครบ หากหน้า Setup ปรากฏแทนหน้าล็อกอิน ให้หยุด Metabase และตรวจไฟล์ที่คัดลอกก่อนสร้างบัญชีใหม่
+
+Compose นี้ใช้ `MB_DB_FILE=/metabase-data/metabase.db` ซึ่งใน image ที่ทดสอบเก็บไฟล์ H2 ที่ `/metabase-data/metabase.db/metabase.db.mv.db` หากใช้ image/ตำแหน่งฐานข้อมูลต่างออกไป ให้ตรวจ path จริงก่อนย้าย เครื่องใหม่ที่ยังไม่มีข้อมูล Metabase ข้ามขั้นตอนนี้ได้
+
+`docker compose down` เก็บ named volumes ไว้ แต่ `docker compose down -v` / `make down-v` ลบทั้งฐานข้อมูลคลังข้อมูลและข้อมูล Metabase จึงไม่ใช้คำสั่งนี้สำหรับ restart ปกติ สำเนาสำรองมีข้อมูลบัญชีและการเชื่อมต่อ ควรเก็บเฉพาะในเครื่อง (`.metabase-backup/` ถูก ignore)
 
 ---
 
@@ -226,7 +262,14 @@ erDiagram
 | Dashboard / คำถามทางธุรกิจ | ตารางข้อมูลที่ใช้ | รูปแบบ Visualization ที่แนะนำ |
 | :--- | :--- | :--- |
 | **1. Sales Performance & Promotion Effect** | `m01_sales_performance` | - **Line Chart:** แนวโน้มรายได้รายเดือนแยกตาม Category<br>- **Bar Chart:** ยอดขายและ AOV ตามประเภท Promotion |
-| **2. Customer Intelligence & Loyalty** | `m02_customer_intelligence` | - **Pie / Donut Chart:** สัดส่วนลูกค้าและยอดใช้จ่ายแยกตาม Loyalty Level<br>- **Bar Chart:** วิธีการชำระเงินยอดนิยมในแต่ละสาขา |
+| **2. Customer Intelligence & Loyalty** | `m02_customer_intelligence` | - **Pie / Donut Chart:** สัดส่วนยอดใช้จ่ายแยกตาม Loyalty Level (จำนวนลูกค้าให้นับ distinct จาก Fact)<br>- **Bar Chart:** วิธีการชำระเงินยอดนิยมในแต่ละสาขา |
 | **3. Inventory & Supply Chain Risk** | `m03_inventory_risk` | - **Table / Heatmap:** Stockout Rate (%) แยกตาม Store Location และ Category<br>- **Scatter / Bar:** ความคลาดเคลื่อน Forecast Variance เทียบกับ Lead Time |
 | **4. Loyalty Upgrade Impact (SCD2 Uplift)** | `m04_loyalty_upgrade_impact` | - **Bar Chart:** Uplift vs Control (%) เมื่อลูกค้าเลื่อนขั้น (Bronze -> Silver, Silver -> Gold, Gold -> Platinum)<br>- **Metric Card:** Average Spend ต่อ 30 วันหลัง Upgrade |
 
+
+### กฎการรวมตัวเลขสำหรับ Dashboard
+
+- **จำนวนลูกค้า:** `unique_customers` ใน m02 เป็น distinct ภายในแต่ละกลุ่ม (ระดับสมาชิก × เพศ × วิธีชำระเงิน × ทำเล) ห้าม SUM ข้ามกลุ่ม เพราะลูกค้าคนเดียวปรากฏได้หลายกลุ่ม หากต้องการจำนวนลูกค้าของช่วง/กลุ่มใหม่ ให้นับ `count(distinct c.customer_id)` จาก Fact ที่ join กับ `dim_customer` ตาม `customer_key` และใช้ตัวกรองที่ต้องการ ลูกค้าที่เปลี่ยนระดับระหว่างปีอาจอยู่หลายระดับ จึงไม่ควรใช้สัดส่วนจำนวนลูกค้าแต่ละระดับเป็น donut ของลูกค้าที่ไม่ซ้ำทั้งปี
+- **AOV:** รวมใหม่ด้วย `sum(total_revenue) / nullif(sum(total_transactions), 0)` สำหรับ m01 หรือ `sum(total_spent) / nullif(sum(total_transactions), 0)` สำหรับ m02 ไม่ใช้ SUM/AVG ของ `aov` รายกลุ่ม ปัจจุบันต้นทางมีหนึ่งรายการต่อ transaction; หากอนาคตมีหลาย line items ต่อบิล ต้องนับ distinct transaction จาก Fact สำหรับกลุ่มใหม่
+- **Stockout rate:** ใช้ `100.0 * sum(stockout_events) / nullif(sum(total_events), 0)` ไม่เฉลี่ยเปอร์เซ็นต์รายกลุ่มตรง ๆ โดยตัวหารเป็นรายการขาย ไม่ใช่จำนวน SKU ทุกวัน
+- **m04:** แสดงค่ารายคู่ระดับสมาชิกโดยตรง ไม่บวกหรือเฉลี่ย `uplift_vs_control` และยอดต่อ 30 วันข้ามคู่ระดับโดยไม่มีตัวถ่วงน้ำหนัก
