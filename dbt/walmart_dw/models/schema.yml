@@ -156,3 +156,58 @@ models:
           - relationships:
               to: ref('dim_date')
               field: date_key
+
+  - name: m01_sales_performance
+    description: "Metric layer: Total revenue, units sold, and AOV by store, category, and promotion"
+    columns:
+      - name: year
+        data_tests: [not_null]
+      - name: month_name
+        data_tests: [not_null]
+      - name: category
+        data_tests: [not_null]
+      - name: store_location
+        data_tests: [not_null]
+      - name: total_transactions
+        data_tests: [not_null]
+      - name: total_revenue
+        data_tests: [not_null]
+
+  - name: m02_customer_intelligence
+    description: "Metric layer: Customer purchasing behaviour, income, and AOV across loyalty tiers and payment methods"
+    columns:
+      - name: customer_loyalty_level
+        data_tests: [not_null]
+      - name: payment_method
+        data_tests: [not_null]
+      - name: store_location
+        data_tests: [not_null]
+      - name: unique_customers
+        data_tests: [not_null]
+      - name: total_spent
+        data_tests: [not_null]
+
+  - name: m03_inventory_risk
+    description: "Metric layer: Stockout rate and demand forecast variance across categories, locations, and weather"
+    columns:
+      - name: store_location
+        data_tests: [not_null]
+      - name: category
+        data_tests: [not_null]
+      - name: total_events
+        data_tests: [not_null]
+      - name: stockout_rate_pct
+        data_tests: [not_null]
+
+  - name: m04_loyalty_upgrade_impact
+    description: "Metric layer: Spend per 30 days after customer loyalty tier upgrade compared to stable control group"
+    columns:
+      - name: from_tier
+        data_tests: [not_null]
+      - name: to_tier
+        data_tests: [not_null]
+      - name: upgraded_customers
+        data_tests: [not_null]
+      - name: uplift_vs_control
+        data_tests: [not_null]
+
