@@ -43,7 +43,7 @@ docker compose ps
 docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt debug"
 ```
 
-#### 2.2 สร้างโมเดลทั้งหมด (Staging -> Dimensions -> Fact -> Metrics)
+#### 2.2 สร้างโมเดลทั้งหมด (Staging -> Dimensions -> Fact -> Metrics / Summary)
 ```bash
 docker exec -it wmt_dbt bash -c "cd walmart_dw && dbt run"
 ```
@@ -235,6 +235,7 @@ erDiagram
   - `m02_customer_intelligence`: พฤติกรรมการซื้อและ AOV แยกตามระดับสมาชิก
   - `m03_inventory_risk`: อัตราสินค้าขาดสต็อกและความคลาดเคลื่อนของการพยากรณ์ดีมานด์
   - `m04_loyalty_upgrade_impact`: ยอดใช้จ่ายต่อ 30 วันหลังเลื่อนระดับ เทียบกับกลุ่มควบคุม (ลูกค้าระดับเดิมที่ไม่ได้เลื่อน ในช่วงเวลาเดียวกัน)
+- **Summary Layer:** `smt_sales_summary` — ROLLUP ของปี/ไตรมาส/เดือน ร่วมกับ CUBE ของทำเล/หมวดสินค้า พร้อมยอดย่อยและยอดรวมทุกระดับ
 
 ---
 
@@ -273,3 +274,102 @@ erDiagram
 - **AOV:** รวมใหม่ด้วย `sum(total_revenue) / nullif(sum(total_transactions), 0)` สำหรับ m01 หรือ `sum(total_spent) / nullif(sum(total_transactions), 0)` สำหรับ m02 ไม่ใช้ SUM/AVG ของ `aov` รายกลุ่ม ปัจจุบันต้นทางมีหนึ่งรายการต่อ transaction; หากอนาคตมีหลาย line items ต่อบิล ต้องนับ distinct transaction จาก Fact สำหรับกลุ่มใหม่
 - **Stockout rate:** ใช้ `100.0 * sum(stockout_events) / nullif(sum(total_events), 0)` ไม่เฉลี่ยเปอร์เซ็นต์รายกลุ่มตรง ๆ โดยตัวหารเป็นรายการขาย ไม่ใช่จำนวน SKU ทุกวัน
 - **m04:** แสดงค่ารายคู่ระดับสมาชิกโดยตรง ไม่บวกหรือเฉลี่ย `uplift_vs_control` และยอดต่อ 30 วันข้ามคู่ระดับโดยไม่มีตัวถ่วงน้ำหนัก
+
+
+## Week 8: Grain, ROLLUP/CUBE และ Summary Table (Issue #2)
+
+### Grain: หนึ่งแถวแทนอะไร
+
+รายละเอียดเดียวกันบันทึกใน `dbt/walmart_dw/models/schema.yml` และแสดงใน dbt Docs:
+
+| Model | Grain / คอลัมน์กำหนดหนึ่งแถว |
+| :--- | :--- |
+| `stg_walmart_sales` | หนึ่งรายการขายต่อ `transaction_id` หลัง deduplicate; ข้อมูลปัจจุบันมีหนึ่งสินค้าในแต่ละ transaction |
+| `dim_product` | หนึ่งชุด `(product_id, product_name, category)` |
+| `dim_store` | หนึ่งชุด `(store_id, store_location)`; หนึ่งทำเลมีหลายสาขา |
+| `dim_customer` | หนึ่ง `(customer_id, version_number)` ตามช่วง `[valid_from, valid_to)` แบบ SCD2 |
+| `dim_supplier` | หนึ่งชุด `(supplier_id, supplier_lead_time)` |
+| `dim_date` | หนึ่งวันที่พบในข้อมูลขาย ไม่ใช่ date spine ที่เติมวันไม่มีการขาย |
+| `fct_walmart_sales` | หนึ่งรายการขาย กำหนดด้วย `sales_key` จาก transaction/product/timestamp |
+| `m01_sales_performance` | ปี × เดือน × หมวดสินค้า × ทำเล × สถานะวันหยุด × ประเภทโปรโมชัน |
+| `m02_customer_intelligence` | ระดับสมาชิก × เพศ × วิธีชำระเงิน × ทำเล ตลอดช่วงข้อมูล |
+| `m03_inventory_risk` | ทำเล × หมวดสินค้า × สภาพอากาศ ตลอดช่วงข้อมูล |
+| `m04_loyalty_upgrade_impact` | หนึ่งคู่ระดับสมาชิก `(from_tier, to_tier)` |
+| `smt_sales_summary` | `grouping_id` × ค่ามิติที่คงอยู่ใน `(year, quarter, month_number, store_location, category)` |
+
+### โครงสร้าง Summary
+
+Summary เป็นตาราง aggregate จาก Fact เดิม ไม่ใช่เหตุการณ์ธุรกิจใหม่ จึงไม่เพิ่ม fact อิสระ โดยใช้:
+
+```sql
+GROUP BY ROLLUP(year, quarter, month_number), CUBE(store_location, category)
+```
+
+- `time_grain`: `month` → `quarter` → `year` → `all_time` เป็นลำดับ ROLLUP
+- `dimension_grain`: `location_category`, `location`, `category`, `all_dimensions` เป็นสี่ชุดของ CUBE
+- รวมเป็น **16 ชุดระดับสรุป** จำนวนแถวจริงขึ้นอยู่กับข้อมูล (ข้อมูลจำลองปี 2024 ปัจจุบันได้ 324 แถว)
+- `grouping_id = GROUPING(year, quarter, month_number, store_location, category)` ใช้ bit 16/8/4/2/1 ตามลำดับ; bit เป็น 1 หมายถึงมิตินั้นถูกยุบรวม ค่า 31 คือ Grand Total
+- มิติที่ยุบรวมมีค่า NULL; ค่าที่เป็น NULL จริงในข้อมูลอาจเกิดได้เช่นกัน ให้ใช้ grouping bits/grain แยกความหมาย ห้ามใช้ `IS NULL` เพียงอย่างเดียวระบุ subtotal
+- `summary_key` รวม grouping bits และค่ามิติทั้งหมด จึงแยกแถวที่ถูกยุบรวมออกจากแถว NULL จริงได้
+- Measures: `total_revenue`, `total_units_sold`, `total_transactions` (distinct transaction ที่แต่ละ grain), `aov` (ยอดขาย ÷ จำนวนบิล คำนวณใหม่จาก Fact ทุกระดับ)
+- ถ้า Fact ว่าง จะมี Grand Total หนึ่งแถว ยอดขาย/จำนวนชิ้น/จำนวนบิลเป็น 0 และ AOV เป็น NULL
+
+### ตัวอย่าง Roll-up / Drill-down สำหรับ Metabase
+
+เลือก **หนึ่ง `time_grain` และหนึ่ง `dimension_grain`** ก่อนใช้ตาราง เพราะหลายระดับครอบคลุมรายการขายชุดเดียวกัน ห้าม SUM ทั้งตาราง
+
+```sql
+-- Grand Total เพียงแถวเดียว
+SELECT total_revenue, total_units_sold, total_transactions, aov
+FROM smt_sales_summary
+WHERE grouping_id = 31;
+
+-- Roll-up: ยอดขายรวมทุกทำเล/หมวดสินค้าแยกปี
+SELECT year, total_revenue, total_transactions, aov
+FROM smt_sales_summary
+WHERE time_grain = 'year' AND dimension_grain = 'all_dimensions'
+ORDER BY year;
+
+-- Drill-down: ปี 2024 ลงสู่ไตรมาส
+SELECT year, quarter, total_revenue, aov
+FROM smt_sales_summary
+WHERE time_grain = 'quarter' AND dimension_grain = 'all_dimensions'
+  AND year = 2024
+ORDER BY year, quarter;
+
+-- Drill-down: ไตรมาส 1 ลงสู่เดือน รักษา year/quarter context
+SELECT year, quarter, month_number, total_revenue, aov
+FROM smt_sales_summary
+WHERE time_grain = 'month' AND dimension_grain = 'all_dimensions'
+  AND year = 2024 AND quarter = 1
+ORDER BY month_number;
+
+-- CUBE: แต่ละทำเลรวมทุกหมวดสินค้าในปี 2024
+SELECT store_location, total_revenue, total_transactions, aov
+FROM smt_sales_summary
+WHERE time_grain = 'year' AND dimension_grain = 'location' AND year = 2024
+ORDER BY total_revenue DESC;
+
+-- CUBE: หมวดสินค้ารวมทุกทำเลในปีเดียวกัน
+SELECT category, total_revenue, total_transactions, aov
+FROM smt_sales_summary
+WHERE time_grain = 'year' AND dimension_grain = 'category' AND year = 2024
+ORDER BY total_revenue DESC;
+```
+
+Summary นี้รองรับทำเล (เมือง), หมวดสินค้า และเวลา ไม่มีระดับ store_id, รายวัน, สมาชิก หรือโปรโมชัน หากต้องการตัวกรองเหล่านั้นให้ใช้ Fact/metric ที่มี grain รองรับ อัตราและ distinct counts ไม่ใช่ additive measures: เลือกแถว subtotal ที่ต้องการหรือคำนวณใหม่จาก Fact; ห้ามเฉลี่ย AOV รายแถว หากอนาคตมีหลายสินค้าต่อบิล จำนวนบิลอาจซ้ำข้ามหมวดสินค้า แต่ Summary ยังคงนับ distinct ให้ถูกต้องแยกทุกระดับ
+
+### การสร้างและตรวจสอบ
+
+```bash
+# สร้างทุกโมเดลและตรวจ tests รวม Summary
+docker exec wmt_dbt bash -c "cd walmart_dw && dbt build"
+# สร้างเฉพาะ Summary และตรวจ tests ของมัน (ต้องมี Fact/Dimensions แล้ว)
+docker exec wmt_dbt bash -c "cd walmart_dw && dbt build --select smt_sales_summary"
+# สร้างเอกสาร Grain/Lineage
+docker exec wmt_dbt bash -c "cd walmart_dw && dbt docs generate"
+```
+
+- `assert_sales_summary_grand_total.sql`: ต้องมี Grand Total หนึ่งแถว และยอดขาย/ชิ้น/บิลตรงกับ Fact
+- `assert_sales_summary_reconciles.sql`: เทียบทั้ง 16 ชุดระดับกับ GROUP BY จาก Fact โดยตรง รวม AOV และ grain labels; ตรวจพบยอดผิด แถวหาย หรือแถวเกิน ไม่ใช่เพียงเทียบยอดรวม
+- `assert_sales_summary_grain.sql`: ต้องไม่ซ้ำใน grain ของแต่ละระดับ พร้อม generic tests สำหรับ summary key, grouping IDs, labels และ measures ที่ห้ามว่าง
