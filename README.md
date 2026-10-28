@@ -373,3 +373,14 @@ docker exec wmt_dbt bash -c "cd walmart_dw && dbt docs generate"
 - `assert_sales_summary_grand_total.sql`: ต้องมี Grand Total หนึ่งแถว และยอดขาย/ชิ้น/บิลตรงกับ Fact
 - `assert_sales_summary_reconciles.sql`: เทียบทั้ง 16 ชุดระดับกับ GROUP BY จาก Fact โดยตรง รวม AOV และ grain labels; ตรวจพบยอดผิด แถวหาย หรือแถวเกิน ไม่ใช่เพียงเทียบยอดรวม
 - `assert_sales_summary_grain.sql`: ต้องไม่ซ้ำใน grain ของแต่ละระดับ พร้อม generic tests สำหรับ summary key, grouping IDs, labels และ measures ที่ห้ามว่าง
+
+## Metabase Dashboard: Walmart | Retail Intelligence
+
+Dashboard ที่สร้างแล้วมี 15 กราฟ แบ่งเป็น **Overview, Customers, Inventory และ Loyalty** พร้อม KPI, ข้อความสรุป Insight และสูตรรวมตัวเลขที่ตรวจแล้ว
+
+- [PDF เวอร์ชันล่าสุดครบ 4 แท็บ](metabase/Walmart%20-%20Retail%20Intelligence.pdf)
+- [คู่มือสร้าง Dashboard และรายละเอียดการคำนวณ](metabase/README.md)
+- [SQL ของทั้ง 15 questions](metabase/dashboard_queries.sql)
+- [Queries, chart settings และการแบ่งแท็บ](metabase/dashboard-design.json)
+
+เครื่องที่สร้าง Dashboard นี้เปิดได้ที่ [localhost:33000/dashboard/2](http://localhost:33000/dashboard/2) หมายเลข Dashboard/Question/Database ใน JSON เป็นของเครื่องนี้และต้องปรับเมื่อสร้างในเครื่องอื่น ไฟล์ Git ใช้เป็นเอกสารและต้นแบบ; Dashboard ที่แก้ไขได้จริงยังเก็บใน Metabase application database volume ไม่ได้ติดตั้งให้อัตโนมัติด้วยการ pull
