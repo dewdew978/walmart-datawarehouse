@@ -1,8 +1,8 @@
 # Walmart | Retail Intelligence
 
-Reference: the user's local `Metabase - Walmart.pdf` (3 pages). Recreate it as a
-new dashboard; the PDF contains rendered charts, not the original saved questions,
-SQL, dashboard objects or filter mappings.
+The dashboard was recreated from a three-page reference export. That source PDF
+contained rendered charts, not the original saved questions, SQL, dashboard
+objects or filter mappings.
 
 `dashboard_queries.sql` contains 15 independent questions in display order, with
 suggested chart types and formatting. The existing dataset is synthetic 2024 data.
@@ -51,7 +51,7 @@ do not modify accounts or recover/reset credentials.
 
 - Local dashboard: http://localhost:33000/dashboard/2-walmart-pdf-recreation
 - 15 saved questions, IDs 40 through 54, in Our analytics.
-- Export: `Walmart - PDF Recreation.pdf` in this directory.
+- Current export: `Walmart - Retail Intelligence.pdf` in this directory.
 - All 15 SQL queries were checked against PostgreSQL. The saved dashboard was
   checked for missing cards/query errors, and the exported PDF was rendered and
   visually reviewed with all charts present.
@@ -78,8 +78,7 @@ records the question queries and visualization settings. Dashboard tabs,
 positions and text notes are stored in Metabase itself. All four tabs were
 visually checked, with 8/2/3/2 charts respectively and no query errors.
 
-`Walmart - PDF Recreation.pdf` is the earlier single-page-layout export, before
-the four-tab redesign. `Walmart - Retail Intelligence.pdf` is the current
-four-page export (Overview, Customers, Inventory, Loyalty), combined from the
-native per-tab PDFs in `pdf-tabs/`, with navigation bookmarks. All four pages
-were rendered and visually checked after export.
+`Walmart - Retail Intelligence.pdf` is the current four-page export (Overview,
+Customers, Inventory, Loyalty), with navigation bookmarks. It is the only PDF
+kept in the repository. All four pages were rendered and visually checked after
+export.
