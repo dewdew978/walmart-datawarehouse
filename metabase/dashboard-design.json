@@ -1,0 +1,557 @@
+{
+  "dashboard_id": 2,
+  "dashboard_name": "Walmart | Retail Intelligence",
+  "tabs": [
+    {
+      "name": "Overview",
+      "question_ids": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        54
+      ]
+    },
+    {
+      "name": "Customers",
+      "question_ids": [
+        47,
+        48
+      ]
+    },
+    {
+      "name": "Inventory",
+      "question_ids": [
+        49,
+        50,
+        51
+      ]
+    },
+    {
+      "name": "Loyalty",
+      "question_ids": [
+        52,
+        53
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "name": "Total revenue",
+      "original_card_id": 40,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select total_revenue\nfrom smt_sales_summary where grouping_id = 31",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "scalar",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {
+        "column_settings": {
+          "[\"name\",\"total_revenue\"]": {
+            "decimals": 2,
+            "prefix": "$"
+          }
+        }
+      }
+    },
+    {
+      "name": "Transactions",
+      "original_card_id": 41,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select total_transactions\nfrom smt_sales_summary where grouping_id = 31",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "scalar",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {
+        "column_settings": {
+          "[\"name\",\"total_transactions\"]": {
+            "decimals": 0,
+            "prefix": ""
+          }
+        }
+      }
+    },
+    {
+      "name": "Units sold",
+      "original_card_id": 42,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select total_units_sold\nfrom smt_sales_summary where grouping_id = 31",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "scalar",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {
+        "column_settings": {
+          "[\"name\",\"total_units_sold\"]": {
+            "decimals": 0,
+            "prefix": ""
+          }
+        }
+      }
+    },
+    {
+      "name": "Avg. order value",
+      "original_card_id": 43,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select aov\nfrom smt_sales_summary where grouping_id = 31",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "scalar",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {
+        "column_settings": {
+          "[\"name\",\"aov\"]": {
+            "decimals": 2,
+            "prefix": "$"
+          }
+        }
+      }
+    },
+    {
+      "name": "Revenue by city",
+      "original_card_id": 44,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select store_location, total_revenue\nfrom smt_sales_summary\nwhere time_grain = 'all_time' and dimension_grain = 'location'\norder by total_revenue desc",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "row",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "store_location"
+        ],
+        "graph.metrics": [
+          "total_revenue"
+        ],
+        "graph.x_axis.title_text": "City",
+        "graph.y_axis.title_text": "Revenue (USD)",
+        "graph.show_values": true,
+        "graph.label_value_formatting": "compact",
+        "series_settings": {
+          "total_revenue": {
+            "color": "#509EE3"
+          }
+        }
+      }
+    },
+    {
+      "name": "Units per bill by promotion",
+      "original_card_id": 45,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select promotion_type,\n       round(sum(quantity_sold)::numeric / nullif(count(distinct transaction_id), 0), 2)\n           as units_per_transaction\nfrom fct_walmart_sales\ngroup by promotion_type\norder by units_per_transaction",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "bar",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "promotion_type"
+        ],
+        "graph.metrics": [
+          "units_per_transaction"
+        ],
+        "graph.x_axis.title_text": "Promotion",
+        "graph.y_axis.title_text": "Units per bill",
+        "graph.show_values": true,
+        "graph.label_value_formatting": "compact",
+        "series_settings": {
+          "units_per_transaction": {
+            "color": "#F9D45C"
+          }
+        }
+      }
+    },
+    {
+      "name": "Monthly revenue | 2024",
+      "original_card_id": 46,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select make_date(year, month_number, 1) as month, total_revenue\nfrom smt_sales_summary\nwhere time_grain = 'month' and dimension_grain = 'all_dimensions' and year = 2024\norder by month",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "line",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "month"
+        ],
+        "graph.metrics": [
+          "total_revenue"
+        ],
+        "graph.x_axis.title_text": "Month",
+        "graph.y_axis.title_text": "Revenue (USD)",
+        "graph.show_values": true,
+        "graph.label_value_formatting": "compact",
+        "series_settings": {
+          "total_revenue": {
+            "color": "#509EE3"
+          }
+        }
+      }
+    },
+    {
+      "name": "Spending & income by membership",
+      "original_card_id": 47,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select c.customer_loyalty_level,\n       sum(f.total_amount) as \"Total spending\",\n       round(avg(c.customer_income), 2) as \"Avg. income\"\nfrom fct_walmart_sales f\njoin dim_customer c on f.customer_key = c.customer_key\ngroup by c.customer_loyalty_level\norder by case c.customer_loyalty_level\n    when 'Bronze' then 1 when 'Silver' then 2 when 'Gold' then 3 when 'Platinum' then 4\nend",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "combo",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "customer_loyalty_level"
+        ],
+        "graph.metrics": [
+          "Total spending",
+          "Avg. income"
+        ],
+        "graph.x_axis.title_text": "Membership tier",
+        "graph.y_axis.title_text": "Spending / income (USD)",
+        "graph.show_values": false,
+        "graph.label_value_formatting": "compact",
+        "series_settings": {
+          "Total spending": {
+            "color": "#509EE3"
+          },
+          "Avg. income": {
+            "color": "#999AC4"
+          }
+        }
+      }
+    },
+    {
+      "name": "Revenue by payment method",
+      "original_card_id": 48,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select payment_method, sum(total_spent) as total_revenue\nfrom m02_customer_intelligence\ngroup by payment_method\norder by total_revenue desc",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "pie",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {}
+    },
+    {
+      "name": "Stockout rate by lead time",
+      "original_card_id": 49,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select sp.supplier_lead_time as supplier_lead_time_days,\n       count(*) as sales_events,\n       count(*) filter (where f.stockout_indicator) as stockout_events,\n       round(100.0 * count(*) filter (where f.stockout_indicator) / nullif(count(*), 0), 2)\n           as stockout_rate_pct\nfrom fct_walmart_sales f\njoin dim_supplier sp on f.supplier_key = sp.supplier_key\ngroup by sp.supplier_lead_time\norder by sp.supplier_lead_time",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "line",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "supplier_lead_time_days"
+        ],
+        "graph.metrics": [
+          "stockout_rate_pct"
+        ],
+        "graph.x_axis.title_text": "Supplier lead time (days)",
+        "graph.y_axis.title_text": "Stockout rate (%)",
+        "graph.show_values": true,
+        "graph.label_value_formatting": "compact",
+        "series_settings": {
+          "stockout_rate_pct": {
+            "color": "#F2A86F"
+          }
+        },
+        "column_settings": {
+          "[\"name\",\"stockout_rate_pct\"]": {
+            "decimals": 1,
+            "suffix": "%"
+          }
+        }
+      }
+    },
+    {
+      "name": "Stockout rate | holiday vs normal",
+      "original_card_id": 50,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select case when d.holiday_indicator then 'Holiday' else 'Normal day' end as day_type,\n       count(*) as sales_events,\n       count(*) filter (where f.stockout_indicator) as stockout_events,\n       round(100.0 * count(*) filter (where f.stockout_indicator) / nullif(count(*), 0), 2)\n           as stockout_rate_pct\nfrom fct_walmart_sales f\njoin dim_date d on f.date_key = d.date_key\ngroup by d.holiday_indicator\norder by d.holiday_indicator",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "bar",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "day_type"
+        ],
+        "graph.metrics": [
+          "stockout_rate_pct"
+        ],
+        "graph.x_axis.title_text": "Day type",
+        "graph.y_axis.title_text": "Stockout rate (%)",
+        "graph.show_values": true,
+        "graph.label_value_formatting": "compact",
+        "series_settings": {
+          "stockout_rate_pct": {
+            "color": "#EF8C8C"
+          }
+        },
+        "column_settings": {
+          "[\"name\",\"stockout_rate_pct\"]": {
+            "decimals": 1,
+            "suffix": "%"
+          }
+        }
+      }
+    },
+    {
+      "name": "Forecast error by weather",
+      "original_card_id": 51,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select weather_conditions,\n       round(avg(actual_demand - forecasted_demand), 2) as avg_forecast_variance\nfrom fct_walmart_sales\ngroup by weather_conditions\norder by weather_conditions",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "bar",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "weather_conditions"
+        ],
+        "graph.metrics": [
+          "avg_forecast_variance"
+        ],
+        "graph.x_axis.title_text": "Weather",
+        "graph.y_axis.title_text": "Actual - forecast (units)",
+        "graph.show_values": true,
+        "graph.label_value_formatting": "compact",
+        "series_settings": {
+          "avg_forecast_variance": {
+            "color": "#98D9D9"
+          }
+        }
+      }
+    },
+    {
+      "name": "Spending after loyalty upgrade",
+      "original_card_id": 52,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select from_tier || ' -> ' || to_tier as tier_transition,\n       spend_per_30d_after_upgrade as \"After upgrade\", control_spend_per_30d as \"Control group\"\nfrom m04_loyalty_upgrade_impact\norder by case from_tier when 'Bronze' then 1 when 'Silver' then 2 when 'Gold' then 3 end",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "bar",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "tier_transition"
+        ],
+        "graph.metrics": [
+          "After upgrade",
+          "Control group"
+        ],
+        "graph.x_axis.title_text": "Upgrade path",
+        "graph.y_axis.title_text": "Spend per 30 days (USD)",
+        "graph.show_values": true,
+        "graph.label_value_formatting": "compact",
+        "series_settings": {
+          "After upgrade": {
+            "color": "#98D9D9"
+          },
+          "Control group": {
+            "color": "#999AC4"
+          }
+        }
+      }
+    },
+    {
+      "name": "Loyalty uplift vs control",
+      "original_card_id": 53,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select from_tier || ' -> ' || to_tier as tier_transition, uplift_vs_control\nfrom m04_loyalty_upgrade_impact\norder by case from_tier when 'Bronze' then 1 when 'Silver' then 2 when 'Gold' then 3 end",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "bar",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "tier_transition"
+        ],
+        "graph.metrics": [
+          "uplift_vs_control"
+        ],
+        "graph.x_axis.title_text": "Upgrade path",
+        "graph.y_axis.title_text": "Uplift vs control (%)",
+        "graph.show_values": true,
+        "graph.label_value_formatting": "compact",
+        "series_settings": {
+          "uplift_vs_control": {
+            "color": "#88BF4D"
+          }
+        },
+        "column_settings": {
+          "[\"name\",\"uplift_vs_control\"]": {
+            "number_style": "percent",
+            "decimals": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "Quarterly revenue | 2024",
+      "original_card_id": 54,
+      "dataset_query": {
+        "database": 2,
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "select make_date(year, (quarter - 1) * 3 + 1, 1) as quarter_start, total_revenue\nfrom smt_sales_summary\nwhere time_grain = 'quarter' and dimension_grain = 'all_dimensions' and year = 2024\norder by quarter_start",
+            "template-tags": []
+          }
+        ]
+      },
+      "display": "line",
+      "displayIsLocked": true,
+      "parameters": [],
+      "type": "question",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "quarter_start"
+        ],
+        "graph.metrics": [
+          "total_revenue"
+        ],
+        "graph.x_axis.title_text": "Quarter",
+        "graph.y_axis.title_text": "Revenue (USD)",
+        "graph.show_values": true,
+        "graph.label_value_formatting": "compact",
+        "series_settings": {
+          "total_revenue": {
+            "color": "#509EE3"
+          }
+        }
+      }
+    }
+  ]
+}
